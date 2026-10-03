@@ -8,17 +8,29 @@ export function useTasks(query, status, page, pageSize) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
+    setError(null);
 
     fetchTasks({ query, status, page, pageSize })
       .then((data) => {
-        setTasks(data.items);
-        setTotal(data.total);
-        setLoading(false);
+        if (!isMounted) return;
+        setTasks(data.items || []);
+        setTotal(data.total || 0);
       })
       .catch((err) => {
-        setError(err.message);
+        if (!isMounted) return;
+        setError(err.message || 'Unable to load tasks');
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, [query, status, page, pageSize]);
 
   return { tasks, total, loading, error };

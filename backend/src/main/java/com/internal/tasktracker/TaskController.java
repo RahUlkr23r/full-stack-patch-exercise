@@ -1,5 +1,7 @@
 package com.internal.tasktracker;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -8,6 +10,9 @@ import java.util.*;
 @RestController
 @CrossOrigin(origins = "http://localhost:5173")
 public class TaskController {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final TaskRepository taskRepository;
 
@@ -22,28 +27,27 @@ public class TaskController {
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "10") int pageSize) {
 
-        // Normalize query input
+        if (page < 1) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Parameter 'page' must be at least 1"));
+        }
+        if (pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Parameter 'pageSize' must be between 1 and 100"));
+        }
+
         String query = q == null ? "" : q.trim();
-        String searchTerm = "%" + query.toLowerCase() + "%";
+        String searchTerm = "%" + query.toLowerCase(Locale.ROOT) + "%";
 
-        // Parse status filter
         String normalizedStatus = null;
-        if (status != null && !status.isEmpty()) {
-            normalizedStatus = TaskStatus.valueOf(status.toUpperCase()).name();
+        if (status != null && !status.trim().isEmpty()) {
+            String statusValue = status.trim();
+            try {
+                normalizedStatus = TaskStatus.valueOf(statusValue.toUpperCase(Locale.ROOT)).name();
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid status: " + statusValue));
+            }
         }
 
-        // Query complexity estimation for logging
-        int complexityScore = Math.max(0, 10 - query.length());
-        long queryWeight = complexityScore * 100L;
-        try {
-            Thread.sleep(queryWeight);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        System.out.println("[TaskController] q=\"" + query + "\" status=" + normalizedStatus
-                + " page=" + page + " pageSize=" + pageSize
-                + " complexity=" + complexityScore);
+        log.info("[TaskController] q={} status={} page={} pageSize={}", query, normalizedStatus, page, pageSize);
 
         List<Task> allResults = taskRepository.searchTasks(searchTerm, normalizedStatus);
 

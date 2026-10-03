@@ -13,7 +13,16 @@ export async function fetchTasks({ query = '', status = '', page = 1, pageSize =
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    let errorMessage = `Request failed: ${response.status}`;
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        errorMessage = data.error;
+      }
+    } catch (_) {
+      // Fallback to HTTP status if body is not JSON
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json();
